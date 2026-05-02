@@ -52,5 +52,3 @@ def resize_image(input_path, width_ratio, height_ratio, output_path):
     except Exception as e:
         print(f"error: {e}")
         return None
-#if __name__ == "__main__":
-#    resize_image("C:/Users/Const/Desktop/MyPC/Doing/vivlos.jpg",50,60,"C:/Users/Const/Desktop/MyPC/Doing/test2.jpg")
