@@ -2,3 +2,6 @@
 .venv/         # 屏蔽虚拟环境
 __pycache__/   # 屏蔽 Python 运行产生的二进制缓存
 *.jpg          # 屏蔽你本地测试产生的所有图片
+*.png
+output/
+test_local.py
