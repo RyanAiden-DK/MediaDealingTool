@@ -44,7 +44,7 @@ def resize_image(input_path, width_ratio, height_ratio, output_path):
                 width_ratio = height_ratio
             new_width = int(width * width_ratio/100)
             new_height = int(height * height_ratio/100)
-            new_img = img.resize((new_width, new_height), resample=Image.LANCZOS)
+            new_img = img.resize((new_width, new_height), resample=Image.Resampling.LANCZOS)
             new_img.save(output_path, format=original_format, optimize=True, quality=100)
             print(f"缩放至：{output_path}")
             return None
@@ -69,7 +69,7 @@ def add_watermark(input_path, output_path, text, font_size, transparency, positi
 
             draw = ImageDraw.Draw(text_layer)
 
-            if position in ["right_bottom", "both"]:
+            if position in ["仅右下角", "对角线和右下角"]:
                 #测量文字尺寸
                 bbox = draw.textbbox((0,0),text,font=font_rb)
                 text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
@@ -80,7 +80,7 @@ def add_watermark(input_path, output_path, text, font_size, transparency, positi
                 draw.text((x, y), text, font=font_rb, fill=(0,0,0,transparency))
 
 
-            if position in ["diagonal", "both"]:
+            if position in ["仅对角线", "对角线和右下角"]:
                 # 同样先测量文字大小
                 bbox_d = draw.textbbox((0, 0), text, font=font_d)
                 tw, th = bbox_d[2] - bbox_d[0], bbox_d[3] - bbox_d[1]
@@ -93,7 +93,7 @@ def add_watermark(input_path, output_path, text, font_size, transparency, positi
 
                 # 旋转画布向右上方倾斜
                 # expand=True 会自动适应文字旋转后大小                      BICUBIC适用于文字旋转
-                rotated_txt = txt_img.rotate(45, expand=True, resample=Image.BICUBIC)
+                rotated_txt = txt_img.rotate(45, expand=True, resample=Image.Resampling.BICUBIC)
 
                 # 计算中心点，把旋转后的水印贴到 text_layer 中心
                 # 使用 rotated_txt 自身作为蒙版

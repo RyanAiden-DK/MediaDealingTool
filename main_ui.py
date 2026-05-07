@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 # 导入三个核心功能
 from processor import compress_by_quality, resize_image, add_watermark
+import datetime
 
 
 class ImageToolUI:
@@ -19,6 +20,7 @@ class ImageToolUI:
         self.root.geometry(f"{win_width}x{win_height}+{position_x}+{position_y}")
         self.root.title("极简图像处理工具 by RyanAidenDK")
         self.root.iconbitmap("RyanAiden-DKicon.ico")
+        self.root.resizable(False, False)
 
         # 1-公共文件选择区域
         self.setup_file_selection()
@@ -41,6 +43,15 @@ class ImageToolUI:
         self.setup_compress_ui()
         self.setup_resize_ui()
         self.setup_watermark_ui()
+
+        # 6-日志提示框
+        self.log_area = tk.Text(self.root, height=10, font=("Consolas", 9), state="disabled")
+        self.log_area.pack(padx=(5, 5), pady=10, fill="x")
+
+        self.log("欢迎使用极简图像处理工具", color="black")
+        self.log("准备就绪，请选择待处理图片...", color="black")
+
+
 
         #小项目用简易的填充布局(只学了这个，下次学自定义）
     def setup_file_selection(self):
@@ -79,7 +90,7 @@ class ImageToolUI:
     def setup_watermark_ui(self):
         tk.Label(self.tab_watermark, text="水印内容:", font=("微软雅黑", 15)).pack(pady=(50,10))
         self.wm_text = tk.Entry(self.tab_watermark)
-        self.wm_text.insert(0, "67")
+        self.wm_text.insert(0, "RyanAiden-DK")
         self.wm_text.pack()
 
         tk.Label(self.tab_watermark, text="位置选择:", font=("微软雅黑", 15)).pack(pady=10)
@@ -101,18 +112,63 @@ class ImageToolUI:
         return p.rsplit('.', 1)[0] + f"_{suffix}." + p.rsplit('.', 1)[1]
 
     def run_compress(self):
-        compress_by_quality(self.input_path.get(), self.get_output_path("min"), self.quality_val.get())
-        messagebox.showinfo("提示", "压缩成功！")
+        try:
+            q_val = self.quality_val.get()
+            suffix_1 = f"compressed_{q_val}"
+            op_path1 =self.get_output_path(suffix_1)
+            compress_by_quality(self.input_path.get(), op_path1, q_val)
+            self.log(f"压缩完成，文件保存至{op_path1}", color="green")
+            messagebox.showinfo("提示", "压缩成功！")
+        except Exception as e:
+            if str(e) == "list index out of range":
+                self.log("请检查文件路径是否正确", color="red")
+            else:
+                self.log(f"水印添加失败，错误为{e}", color="red")
 
     def run_resize(self):
-        resize_image(self.input_path.get(), float(self.w_ratio.get()), float(self.h_ratio.get()),
-                     self.get_output_path("size"))
-        messagebox.showinfo("提示", "缩放成功！")
+        try:
+            size_w = self.w_ratio.get()
+            if float(size_w) <= 0:
+                self.log("比例错误", color="red")
+                return
+            size_h = self.h_ratio.get()
+            suffix_2 = f"resized_{size_w}{size_h}"
+            op_path2 = self.get_output_path(suffix_2)
+            resize_image(self.input_path.get(), float(size_w), float(size_h), op_path2)
+            self.log(f"缩放完成，文件保存至{op_path2}", color="green")
+            messagebox.showinfo("提示", "缩放成功！")
+        except Exception as e:
+            if str(e) == "list index out of range":
+                self.log("请检查文件路径是否正确", color="red")
+            else:
+                self.log(f"水印添加失败，错误为{e}", color="red")
 
     def run_watermark(self):
-        add_watermark(self.input_path.get(), self.get_output_path("marked"), self.wm_text.get(), 100, 70,
-                      self.wm_pos.get())
-        messagebox.showinfo("提示", "水印添加成功！")
+        try:
+            watermark_text = self.wm_text.get()
+            suffix_3 = f"wm_{watermark_text}"
+            op_path3 = self.get_output_path(suffix_3)
+            add_watermark(self.input_path.get(), op_path3, watermark_text, 100, 70,
+                          self.wm_pos.get())
+            self.log(f"水印添加完成，文件保存至{op_path3}", color="green")
+            messagebox.showinfo("提示", "水印添加成功！")
+        except Exception as e:
+            if str(e) == "list index out of range":
+                self.log("请检查文件路径是否正确", color="red")
+            else:
+                self.log(f"水印添加失败，错误为{e}", color="red")
+    # 日志输出
+    def log(self, message, color):
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        full_msg = f"[{current_time}]:{message}\n"
+        self.log_area.config(state="normal")  # 解锁
+        self.log_area.insert("end", full_msg)  # 写入
+        end_idx = self.log_area.index("end-1c")
+        start_idx = self.log_area.index("end-2c linestart")
+        self.log_area.tag_config(color, foreground=color)
+        self.log_area.tag_add(color, start_idx, end_idx)
+        self.log_area.see("end")  # 自动滚动到最后一行
+        self.log_area.config(state="disabled")  # 锁定
 
 
 if __name__ == "__main__":
