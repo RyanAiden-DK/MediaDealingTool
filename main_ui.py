@@ -3,6 +3,8 @@ from tkinter import ttk, filedialog, messagebox
 # 导入三个核心功能
 from processor import compress_by_quality, resize_image, add_watermark
 import datetime
+import os
+import threading
 
 
 class ImageToolUI:
@@ -19,7 +21,7 @@ class ImageToolUI:
 
         self.root.geometry(f"{win_width}x{win_height}+{position_x}+{position_y}")
         self.root.title("极简图像处理工具 by RyanAidenDK")
-        self.root.iconbitmap("RyanAiden-DKicon.ico")
+        self.root.iconbitmap(os.path.join(os.path.dirname(__file__), "RyanAiden-DKicon.ico"))
         self.root.resizable(False, False)
 
         # 1-公共文件选择区域
@@ -47,6 +49,9 @@ class ImageToolUI:
         # 6-日志提示框
         self.log_area = tk.Text(self.root, height=10, font=("Consolas", 9), state="disabled")
         self.log_area.pack(padx=(5, 5), pady=10, fill="x")
+        self.log_area.tag_config("black", foreground="black")
+        self.log_area.tag_config("green", foreground="green")
+        self.log_area.tag_config("red", foreground="red")
 
         self.log("欢迎使用极简图像处理工具", color="black")
         self.log("准备就绪，请选择待处理图片...", color="black")
@@ -98,6 +103,10 @@ class ImageToolUI:
         self.wm_pos.current(0)
         self.wm_pos.pack()
 
+        tk.Label(self.tab_watermark, text="透明度（0-100）:", font=("微软雅黑", 15)).pack(pady=10)
+        self.wm_trs = tk.Entry(self.tab_watermark)
+        self.wm_trs.pack()
+
         tk.Button(self.tab_watermark, text="添加水印", command=self.run_watermark, bg="#FF9800", fg="white").pack(
             pady=20)
 
@@ -107,68 +116,69 @@ class ImageToolUI:
         if path: self.input_path.set(path)
 
     def get_output_path(self, suffix):
-        # 简单处理：在原文件名后加后缀，比如 test_compressed.jpg
-        p = self.input_path.get()
-        return p.rsplit('.', 1)[0] + f"_{suffix}." + p.rsplit('.', 1)[1]
+        root, ext = os.path.splitext(self.input_path.get())
+        return f"{root}_{suffix}{ext}"
 
     def run_compress(self):
-        try:
-            q_val = self.quality_val.get()
-            suffix_1 = f"compressed_{q_val}"
-            op_path1 =self.get_output_path(suffix_1)
-            compress_by_quality(self.input_path.get(), op_path1, q_val)
-            self.log(f"压缩完成，文件保存至{op_path1}", color="green")
-            messagebox.showinfo("提示", "压缩成功！")
-        except Exception as e:
-            if str(e) == "list index out of range":
-                self.log("请检查文件路径是否正确", color="red")
-            else:
-                self.log(f"水印添加失败，错误为{e}", color="red")
+        if not self.input_path.get():
+            self.log("请先选择图片文件", color="red")
+            return
+        def task():
+            try:
+                q_val = self.quality_val.get()
+                op_path = self.get_output_path(f"compressed_{q_val}")
+                compress_by_quality(self.input_path.get(), op_path, q_val)
+                self.root.after(0, lambda: self.log(f"压缩完成，文件保存至{op_path}", color="green"))
+                self.root.after(0, lambda: messagebox.showinfo("提示", "压缩成功！"))
+            except Exception as e:
+                msg = "请检查文件路径是否正确" if "list index" in str(e) else f"压缩失败: {e}"
+                self.root.after(0, lambda m=msg: self.log(m, color="red"))
+        threading.Thread(target=task, daemon=True).start()
 
     def run_resize(self):
-        try:
-            size_w = self.w_ratio.get()
-            if float(size_w) <= 0:
-                self.log("比例错误", color="red")
-                return
-            size_h = self.h_ratio.get()
-            suffix_2 = f"resized_{size_w}{size_h}"
-            op_path2 = self.get_output_path(suffix_2)
-            resize_image(self.input_path.get(), float(size_w), float(size_h), op_path2)
-            self.log(f"缩放完成，文件保存至{op_path2}", color="green")
-            messagebox.showinfo("提示", "缩放成功！")
-        except Exception as e:
-            if str(e) == "list index out of range":
-                self.log("请检查文件路径是否正确", color="red")
-            else:
-                self.log(f"水印添加失败，错误为{e}", color="red")
+        if not self.input_path.get():
+            self.log("请先选择图片文件", color="red")
+            return
+        def task():
+            try:
+                size_w = float(self.w_ratio.get())
+                size_h = float(self.h_ratio.get())
+                if size_w <= 0 or size_h <= 0:
+                    self.root.after(0, lambda: self.log("比例必须大于0", color="red"))
+                    return
+                suffix = f"resized_{size_w}{size_h}"
+                op_path = self.get_output_path(suffix)
+                resize_image(self.input_path.get(), size_w, size_h, op_path)
+                self.root.after(0, lambda: self.log(f"缩放完成，文件保存至{op_path}", color="green"))
+                self.root.after(0, lambda: messagebox.showinfo("提示", "缩放成功！"))
+            except Exception as e:
+                msg = "请检查文件路径是否正确" if "list index" in str(e) else f"缩放失败: {e}"
+                self.root.after(0, lambda m=msg: self.log(m, color="red"))
+        threading.Thread(target=task, daemon=True).start()
 
     def run_watermark(self):
-        try:
-            watermark_text = self.wm_text.get()
-            suffix_3 = f"wm_{watermark_text}"
-            op_path3 = self.get_output_path(suffix_3)
-            add_watermark(self.input_path.get(), op_path3, watermark_text, 100, 70,
-                          self.wm_pos.get())
-            self.log(f"水印添加完成，文件保存至{op_path3}", color="green")
-            messagebox.showinfo("提示", "水印添加成功！")
-        except Exception as e:
-            if str(e) == "list index out of range":
-                self.log("请检查文件路径是否正确", color="red")
-            else:
-                self.log(f"水印添加失败，错误为{e}", color="red")
-    # 日志输出
-    def log(self, message, color):
+        if not self.input_path.get():
+            self.log("请先选择图片文件", color="red")
+            return
+        def task():
+            try:
+                watermark_text = self.wm_text.get() or "RyanAiden-DK"
+                op_path = self.get_output_path(f"wm_{watermark_text}")
+                add_watermark(self.input_path.get(), op_path, watermark_text, self.wm_pos.get(), self.wm_trs.get())
+                self.root.after(0, lambda: self.log(f"水印添加完成，文件保存至{op_path}", color="green"))
+                self.root.after(0, lambda: messagebox.showinfo("提示", "水印添加成功！"))
+            except Exception as e:
+                msg = "请检查文件路径是否正确" if "list index" in str(e) else f"水印添加失败: {e}"
+                self.root.after(0, lambda m=msg: self.log(m, color="red"))
+        threading.Thread(target=task, daemon=True).start()
+
+    def log(self, message, color="black"):
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
         full_msg = f"[{current_time}]:{message}\n"
-        self.log_area.config(state="normal")  # 解锁
-        self.log_area.insert("end", full_msg)  # 写入
-        end_idx = self.log_area.index("end-1c")
-        start_idx = self.log_area.index("end-2c linestart")
-        self.log_area.tag_config(color, foreground=color)
-        self.log_area.tag_add(color, start_idx, end_idx)
-        self.log_area.see("end")  # 自动滚动到最后一行
-        self.log_area.config(state="disabled")  # 锁定
+        self.log_area.config(state="normal")
+        self.log_area.insert("end", full_msg, color)
+        self.log_area.see("end")
+        self.log_area.config(state="disabled")
 
 
 if __name__ == "__main__":

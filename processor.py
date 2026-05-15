@@ -29,83 +29,73 @@ def compress_by_quality(input_path, output_path, aim_quality=80):
 
 
 # 功能2：几何变换-缩放
-# 默认不输入为原图尺寸
 def resize_image(input_path, width_ratio, height_ratio, output_path):
     try:
         with Image.open(input_path) as img:
-            original_format = img.format
-            if (width_ratio is None) and (height_ratio is None):
-                return img
-
             width, height = img.size
-            if (width_ratio is not None) and (height_ratio is None):
-                height_ratio = width_ratio
-            elif (width_ratio is None) and (height_ratio is not None):
-                width_ratio = height_ratio
-            new_width = int(width * width_ratio/100)
-            new_height = int(height * height_ratio/100)
+            new_width = int(width * width_ratio / 100)
+            new_height = int(height * height_ratio / 100)
             new_img = img.resize((new_width, new_height), resample=Image.Resampling.LANCZOS)
-            new_img.save(output_path, format=original_format, optimize=True, quality=100)
+            new_img.save(output_path, format=img.format, optimize=True)
             print(f"缩放至：{output_path}")
-            return None
     except Exception as e:
         print(f"error: {e}")
-        return None
 
 
-#功能3：水印
-def add_watermark(input_path, output_path, text, font_size, transparency, position):
+# 功能3：水印
+def add_watermark(input_path, output_path, text, position, transparency):
     try:
-        with Image.open(input_path).convert("RGBA") as base:
-            text_layer = Image.new("RGBA", base.size, (0,0,0,0))
+        transparency = int(transparency)
+        if transparency<0:
+            transparency = 0
+        if transparency>100:
+            transparency = 100
+        with Image.open(input_path) as img:
+            has_alpha = img.mode in ("RGBA", "P")
+            base = img.convert("RGBA")
+
+            text_layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
+
+            # 根据图片宽度动态计算字号
+            diag_font_size = max(40, base.width // 10)
+            corner_font_size = max(16, diag_font_size // 3)
+
             # 加载字体
             try:
-                font_rb = ImageFont.truetype("arial.ttf", font_size)
-                font_d = ImageFont.truetype("arial.ttf", int(font_size*3))
-            # 默认字体可能不支持中文
+                font_corner = ImageFont.truetype("arial.ttf", corner_font_size)
+                font_diag = ImageFont.truetype("arial.ttf", diag_font_size)
             except IOError:
-                font_rb = ImageFont.load_default()
-                font_d = ImageFont.load_default()
+                font_corner = ImageFont.load_default()
+                font_diag = ImageFont.load_default()
 
             draw = ImageDraw.Draw(text_layer)
 
             if position in ["仅右下角", "对角线和右下角"]:
-                #测量文字尺寸
-                bbox = draw.textbbox((0,0),text,font=font_rb)
-                text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
-                # 留白防止超出
-                x = base.width-text_width-15
-                y = base.height-text_height-40
-
-                draw.text((x, y), text, font=font_rb, fill=(0,0,0,transparency))
-
+                bbox = draw.textbbox((0, 0), text, font=font_corner)
+                tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                x = base.width - tw - 15
+                y = base.height - th - 40
+                draw.text((x, y), text, font=font_corner, fill=(0, 0, 0, transparency))
 
             if position in ["仅对角线", "对角线和右下角"]:
-                # 同样先测量文字大小
-                bbox_d = draw.textbbox((0, 0), text, font=font_d)
+                bbox_d = draw.textbbox((0, 0), text, font=font_diag)
                 tw, th = bbox_d[2] - bbox_d[0], bbox_d[3] - bbox_d[1]
-
-                # 创建一个小画布，大小刚好够放字
-                # 留白防止旋转时边缘切割                                        黑色水印用透明黑
                 txt_img = Image.new("RGBA", (tw + 10, th + 10), (0, 0, 0, 0))
                 d = ImageDraw.Draw(txt_img)
-                d.text((5, 5), text, font=font_d, fill=(0, 0, 0, transparency))
-
-                # 旋转画布向右上方倾斜
-                # expand=True 会自动适应文字旋转后大小                      BICUBIC适用于文字旋转
+                d.text((5, 5), text, font=font_diag, fill=(0, 0, 0, transparency))
                 rotated_txt = txt_img.rotate(45, expand=True, resample=Image.Resampling.BICUBIC)
-
-                # 计算中心点，把旋转后的水印贴到 text_layer 中心
-                # 使用 rotated_txt 自身作为蒙版
                 cx = (base.width - rotated_txt.width) // 2
                 cy = (base.height - rotated_txt.height) // 2
                 text_layer.paste(rotated_txt, (cx, cy), rotated_txt)
 
-            # 透明合成比paste好
             out = Image.alpha_composite(base, text_layer)
 
-            # 转回 RGB 保存（JPEG不支持透明度）
-            out.convert("RGB").save(output_path, "JPEG")
+            # 保留原格式：透明图存 PNG，否则存 JPEG
+            # 但压缩功能固定为 JPEG，统一行为
+            if has_alpha:
+                out.save(output_path, "PNG")
+            else:
+                out.convert("RGB").save(output_path, "JPEG")
             print(f"水印添加成功: {output_path}")
 
     except Exception as e:
